@@ -91,7 +91,7 @@ int main( void )
 	   "     as you may have noticed, array grows up-hill\n"
 	   "     meaning that larger indexes have larger addresses.\n"
 	   "     Try to compile using an up-hill fence:\n"
-	   "        gcc -DUP_FENCE -o stacksmash_simple stacksmash_simple.c\n\n");
+	   "        gcc -DUP_FENCE -o stack_smash stack_smash.c\n\n");
 
   // the relative position of the local variables is compiler-dependent;
   // there are no standards, the only criterion is usually to keep all the
