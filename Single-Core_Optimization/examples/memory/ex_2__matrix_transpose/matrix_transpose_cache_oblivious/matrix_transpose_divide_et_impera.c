@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #if _XOPEN_SOURCE >= 600
 #  include <strings.h>
 #endif
@@ -46,6 +47,7 @@
 #include <time.h>
 #include <math.h>
 
+#include "../mypapi.h"
 
 #define CACHE_OBLIVIOUS 0
 #define NREPETITIONS 5
@@ -61,13 +63,27 @@
                                           (double)ts.tv_nsec * 1e-9;})
 
 
-// In pure cache-oblivious theory, we recurse down to 1x1.
-// In practice, function call overhead outweighs cache benefits at small sizes.
+// We may recurse down to 1x1; however, in practice, function call overhead would
+// outweighs cache benefits at small sizes.
 // We stop at a block size that comfortably fits in the L1 cache.
 
 
+#if !defined(DTYPE)
+// chancge the data type at compile time by
+//# -DDTYPE=double
+//# -DDTYPE=float
+//# -DDTYPE=uint32_t
+// and so on
+
+// default to uint32_t
+#define DTYPE uint32_t
+#endif
+
+typedef DTYPE dtype;
+
+
 // Base case: Standard naive transpose for a small block
-void transpose_block( const double *src, double *dst, 
+void transpose_block( const dtype *src, dtype * restrict dst, 
                       int r_start, int r_end, 
                       int c_start, int c_end, 
                       int n, int m )
@@ -94,7 +110,7 @@ void transpose_block( const double *src, double *dst,
 }
 
 // Recursive function to traverse memory in a Z-order/divide-and-conquer pattern
-void transpose_cache_oblivious( const double *src, double *dst, 
+void transpose_cache_oblivious( const dtype *src, dtype * restrict dst, 
                                 int r_start, int r_end, 
 				int c_start, int c_end, 
 				int n, int m, int threshold )
@@ -134,14 +150,16 @@ int main ( int argc, char **argv )
     printf("arguments: MODE ( 0 = cache oblivious, !=0 standard) N_ROWS N_COLS THRESHOLD (for std block)\n");
     return 0; }
 
-  int mode = (argc > 1? atoi(*(argv+1)) : CACHE_OBLIVIOUS); // running mode
-  int n = (argc > 2? atoi(*(argv+2)) : 4000); // rows
-  int m = (argc > 3? atoi(*(argv+3)) : 3000); // columns
+  PAPI_INIT;
+  
+  int mode      = (argc > 1? atoi(*(argv+1)) : CACHE_OBLIVIOUS); // running mode
+  int n         = (argc > 2? atoi(*(argv+2)) : 4000); // rows
+  int m         = (argc > 3? atoi(*(argv+3)) : 3000); // columns
   int threshold = (argc > 4? atoi(*(argv+4)) : 64); // columns
 
   // Allocate 1D arrays to represent 2D contiguous matrices
-  double *src = (double *)malloc(n * m * sizeof(double));
-  double *dst = (double *)malloc(m * n * sizeof(double));
+  dtype *src = (dtype *)malloc(n * m * sizeof(dtype));
+  dtype *dst = (dtype *)malloc(m * n * sizeof(dtype));
   
   if (!src || !dst) {
     fprintf(stderr, "Memory allocation failed.\n");
@@ -151,22 +169,25 @@ int main ( int argc, char **argv )
   // Initialize source matrix
   unsigned int size = n*m;
   for ( unsigned int i = 0; i < size; i++ )
-    src[i] = (double)i;
+    src[i] = (dtype)i;
 
   double timing_max;
   double timing_sum = 0;
-
-  // warm up
+  
   if ( mode == CACHE_OBLIVIOUS )
     {
+      // warm up
       timing_max = CPU_TIME;
       transpose_cache_oblivious ( src, dst, 0, n, 0, m, n, m, threshold );
       timing_max = CPU_TIME - timing_max;
-  
+
+      // measure
       for ( int r = 0; r < NREPETITIONS; r++ )
 	{
 	  double this_time = CPU_TIME;
+	  PAPI_START_CNTR;
 	  transpose_cache_oblivious ( src, dst, 0, n, 0, m, n, m, threshold );
+	  PAPI_STOP_CNTR;
 	  this_time = CPU_TIME - this_time;
 	  
 	  timing_max  = ( timing_max < this_time  ? this_time : timing_max ); 
@@ -175,14 +196,18 @@ int main ( int argc, char **argv )
     }
   else
     {
+      // warm up
       timing_max = CPU_TIME;
       transpose_block ( src, dst, 0, n, 0, m, n, m );
       timing_max = CPU_TIME - timing_max;
-  
+
+      // measure
       for ( int r = 0; r < NREPETITIONS; r++ )
 	{
 	  double this_time = CPU_TIME;
+	  PAPI_START_CNTR;
 	  transpose_block ( src, dst, 0, n, 0, m, n, m );
+	  PAPI_STOP_CNTR;
 	  this_time = CPU_TIME - this_time;
 	  
 	  timing_max  = ( timing_max < this_time  ? this_time : timing_max ); 
@@ -193,6 +218,19 @@ int main ( int argc, char **argv )
   printf ( "elapsed time (avg out of %d measures): %g s\n",
 	   NREPETITIONS - 1,
 	   (timing_sum - timing_max) / (NREPETITIONS-1) );
+
+
+ #if defined(USE_PAPI)
+  {
+    int event_codes[PAPI_EVENTS_NUM];
+    int nevents;
+    PAPI_list_events( papi_EventSet, event_codes, &nevents);
+    for( int jj = 0; jj < PAPI_EVENTS_NUM; jj++) {
+      char name[PAPI_MAX_STR_LEN+1];
+      PAPI_event_code_to_name(event_codes[jj], name);
+      printf("event %*s : %10llu\n", PAPI_MAX_STR_LEN, name, papi_values[jj]/(NREPETITIONS)); }
+  }
+ #endif
 
   
   // Optional: Verify a few elements
