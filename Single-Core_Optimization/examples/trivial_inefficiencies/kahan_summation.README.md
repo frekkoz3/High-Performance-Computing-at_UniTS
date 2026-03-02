@@ -1,6 +1,6 @@
 # Understanding Floating-Point Summation: A Practical Guide
 
-*DISCLAIMER: this text has been produce by Gemini 3,0 Pro, with the prompt «Consider this code (the `kahan_summation.c`), which shows the non-commutative nature of summation in IEEE floating point arithmetic testing many different summation orders, including the kahan summation. Get through the code and write a commentary / guide for the student, in a markdown file»*
+*DISCLAIMER: this text has been produce by Gemini 3.0 Pro, with the prompt «Consider this code (the `kahan_summation.c`), which shows the non-commutative nature of summation in IEEE floating point arithmetic testing many different summation orders, including the kahan summation. Get through the code and write a commentary / guide for the student, in a markdown file»*
 
 
 
