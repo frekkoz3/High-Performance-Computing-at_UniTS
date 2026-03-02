@@ -16,4 +16,32 @@ The slides are organized as follows:
 | Optimization techniques                   | Fundamental techniques on writing efficient codes accounting for caches, ILP, SIMD, pipelines, branches | `Single-core__cache_branches_pipelines_loops.pdf`        |
 | Sparse topics of interest                 | How to measure performance, overview of pointers, integer representation | `topics.pdf`                                             |
 
+For every main topic, there are example codes that illustrate its traits, as follows
+
+| TOPICS                                         | sub-topics                                                   |
+| ---------------------------------------------- | ------------------------------------------------------------ |
+| ***stack & heap***                             | order of bytes in memory                                     |
+|                                          | understanding the stack |
+|                                          | stack overflow and stack smashing |
+| ***basic steps***                              |                                                              |
+| ***memory hierarchy***                         | contiguous and strided memory traversal of arrays            |
+|                                                | memory mountain                                              |
+|                                                | matrix transposition                                         |
+|                                                | hot & cold fields                                            |
+|                                                | Aos vs SoA                                                   |
+| ***conditional evaluation<br />and branches*** |                                                              |
+| ***loop optimization***                        | matrix multiplication                                        |
+|                                                | array reduction                                              |
+|                                                | array multiplication                                         |
+|                                                | prefetching                                                  |
+| ***debugging***                                | serial & parallel debugging                                  |
+| ***profiling***                                | using `perf`, `valgrind`, `PAPI`; elements of parallel profiling |
+
+
+
+
+
+
+
 Recordings are available at https://drive.google.com/drive/folders/1Ya4EH2lN6ViO4JpWZU-G2xXwKuUh1Rn4?usp=sharing
+
