@@ -104,7 +104,7 @@ Within the user-space 128 TiB, the process memory is organised as follows:
 │   ~~~~~~~~~~~~~~~~~~~~~~~~  (enormous unmapped gap, tens of TiB)
 │                          │
 │          ↑               │
-│   Heap (brk/sbrk)       │  ← grows upward (toward higher addresses)
+│   Heap (brk/sbrk)        │  ← grows upward (toward higher addresses)
 │                          │
 ├──────────────────────────┤    random brk offset (ASLR)
 │   BSS  (uninitialised    │
