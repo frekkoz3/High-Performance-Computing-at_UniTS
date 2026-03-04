@@ -4,3 +4,5 @@ cache line fetches for the hot path, or fits more hot items per line for a bette
 spatial locality.
 However, if we are dominated by latency, as in the pointer_chasing case,
 this effect is not detectable.
+
+Read the accompaining lecture notes for thorough discussion

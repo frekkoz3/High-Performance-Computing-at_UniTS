@@ -32,7 +32,6 @@
 #include <string.h>
 #include <stdint.h>
 
-#include <../mypapi.h>
 
 typedef unsigned char uchar;
 

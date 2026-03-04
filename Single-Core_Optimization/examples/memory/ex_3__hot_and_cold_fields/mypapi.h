@@ -3,8 +3,8 @@
 #if defined(USE_PAPI)                                           // -----------------------------------------------------------
 #include <papi.h>
 
-#define PAPI_EVENTS_NUM 2
-int       papi_events[PAPI_EVENTS_NUM] = {PAPI_TOT_INS, PAPI_TOT_CYC };
+#define PAPI_EVENTS_NUM 5
+int       papi_events[PAPI_EVENTS_NUM] = {PAPI_TOT_INS, PAPI_TOT_CYC, PAPI_L3_LDM, PAPI_RES_STL, PAPI_TLB_DM };
 int       papi_EventSet                = PAPI_NULL;             // the handle for the events' set
 long long papi_buffer[PAPI_EVENTS_NUM] = {0};                   // storage for the counters' values
 long long papi_values[PAPI_EVENTS_NUM] = {0};                   // accumulate the counters' values
@@ -62,11 +62,28 @@ if( retval == PAPI_OK ) {						\
     papi_values[jj] += papi_buffer[jj]; } else PAPI_WARN(retval, "reading counters"); }
 
 
+#define PAPI_SHOW_CNTR {						\
+  int event_codes[PAPI_EVENTS_NUM];					\
+  int nevents;								\
+  PAPI_list_events( papi_EventSet, event_codes, &nevents);		\
+  for( int jj = 0; jj < PAPI_EVENTS_NUM; jj++) {			\
+    char name[PAPI_MAX_STR_LEN+1];					\
+    PAPI_event_code_to_name(event_codes[jj], name);			\
+    printf("event %*s : %10llu\n", PAPI_MAX_STR_LEN, name, papi_values[jj]); }}
+
+#define PAPI_GET_CNTR( i ) ( papi_values[(i)] )
+
 
 #else                                                           // -----------------------------------------------------------
 
+
+#define PAPI_EVENTS_NUM 0
 #define PAPI_INIT
 #define PAPI_START_CNTR
 #define PAPI_STOP_CNTR
+#define PAPI_FLUSH
+#define PAPI_SHOW_CNTR
+#define PAPI_GET_CNTR( i ) 0
+#define PAPI_ACC_CNTR( VALUES )
 
 #endif                                                          // -----------------------------------------------------------

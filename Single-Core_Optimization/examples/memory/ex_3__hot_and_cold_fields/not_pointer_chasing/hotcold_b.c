@@ -27,6 +27,7 @@
 #include <string.h>
 #include <strings.h>
 #include <time.h>
+#include "../mypapi.h"
 
 #define CPU_TIME ({struct  timespec ts; clock_gettime( CLOCK_PROCESS_CPUTIME_ID, &ts ),	\
                                           (double)ts.tv_sec +           \
@@ -39,9 +40,7 @@
 typedef struct node_t {
   double         key;
   double         *data;
-} node;
-
-
+} node_t;
 
 
 #define N_default 100000
@@ -57,14 +56,15 @@ int main( int argc, char **argv )
   if ( argc > 1 )
     N = atoi( *(argv+1) );
 
-
+  PAPI_INIT;
+  
   // -------------------------------------
   // setup
 
   printf("creating and initializing %d nodes\n", N ); fflush(stdout);
   srand48( time(NULL) );
 
-  node   * nodes   = (node*)  calloc( N         , sizeof(node) );
+  node_t * nodes   = (node_t*)  calloc( N         , sizeof(node_t) );
   double * alldata = (double*)calloc( N*DATASIZE, sizeof(double) );
   
   for( int nn = 0; nn < N; nn++ )
@@ -81,7 +81,7 @@ int main( int argc, char **argv )
   printf("now let's search for %d keys\n", NSHOTS); fflush(stdout);
   
   double tstart = CPU_TIME;
-  
+  PAPI_START_CNTR;
   for( int ii = 0; ii < NSHOTS; ii++ )
     {      
       double key = nodes[lrand48() % N].key;
@@ -92,14 +92,22 @@ int main( int argc, char **argv )
       sum += ( nn < N ? nodes[nn].data[DATASIZE/2] : 0 );
       
     }
-
+  PAPI_STOP_CNTR;
   double et = CPU_TIME - tstart;
 
   // we need to print the sum, otherwise the compiler would
   // prune the previous loop entirely
   //
+  // to be neat, we should subtract the cost of PAPI start and stop;
+  // however, we expect that to be negligible for a fair NSHOTS
+  //  
   printf("sum result is: %g, timing for %d shots: %g\n", sum, NSHOTS, et );
 
+  PAPI_SHOW_CNTR;
+ #if defined(USE_PAPI)
+  printf("IPC: %.2g\n", (double)PAPI_GET_CNTR(0) / PAPI_GET_CNTR(1) );
+ #endif
+  
   free ( nodes );
   free ( alldata );
   

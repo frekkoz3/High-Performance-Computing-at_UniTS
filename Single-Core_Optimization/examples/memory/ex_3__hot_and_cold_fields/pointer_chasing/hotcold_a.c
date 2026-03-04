@@ -28,6 +28,7 @@
 #include <strings.h>
 #include <time.h>
 
+#include "../mypapi.h"
 
 #define CPU_TIME ({struct  timespec ts; clock_gettime( CLOCK_PROCESS_CPUTIME_ID, &ts ),	\
                                           (double)ts.tv_sec +           \
@@ -44,8 +45,6 @@ typedef struct node_t {
 } node;
 
 
-
-
 #define N_default 100000
 
 int main( int argc, char **argv )
@@ -59,7 +58,8 @@ int main( int argc, char **argv )
   if ( argc > 1 )
     N = atoi( *(argv+1) );
 
-
+  PAPI_INIT;
+  
   // -------------------------------------
   // setup
 
@@ -72,16 +72,16 @@ int main( int argc, char **argv )
 
   for( int nn = 0; nn < N; nn++ )
     {
-      node *new = (node*)calloc( 1, sizeof(node) );
+      node *newnode = (node*)calloc( 1, sizeof(node) );
       if ( last != NULL )
-	last->next = new;
+	last->next = newnode;
       else
-	first = new;
-      new ->key  = drand48();
-      keys[nn] = new->key;
-      new ->next = NULL;
-      new->data[DATASIZE/2] = (double)nn;
-      last = new;
+	first = newnode;
+      newnode ->key  = drand48();
+      keys[nn] = newnode->key;
+      newnode ->next = NULL;
+      newnode->data[DATASIZE/2] = (double)nn;
+      last = newnode;
     }
 
 
@@ -91,7 +91,8 @@ int main( int argc, char **argv )
   printf("now let's search for %d of them\n", NSHOTS); fflush(stdout);
   
   double tstart = CPU_TIME;
-  
+
+  PAPI_START_CNTR;
   for( int ii = 0; ii < NSHOTS; ii++ )
     {      
       double key = keys[lrand48() % N];
@@ -100,16 +101,24 @@ int main( int argc, char **argv )
       while ( (target != NULL) && (target->key != key) )
 	target = target->next;
       sum += ( (target != NULL) ? (target->data)[DATASIZE/2] : 0 );
-
+      
     }
-
+  PAPI_STOP_CNTR;
   double et = CPU_TIME - tstart;
-
+  
   // we need to print the sum, otherwise the compiler would
   // prune the previous loop entirely
   //
+  // to be neat, we should subtract the cost of PAPI start and stop;
+  // however, we expect that to be negligible for a fair NSHOTS
+  //
   printf("sum result is: %g, timing for %d shots: %g\n", sum, NSHOTS, et );
 
+  PAPI_SHOW_CNTR;
+ #if defined(USE_PAPI)
+  printf("IPC: %.2g\n", (double)PAPI_GET_CNTR(0) / PAPI_GET_CNTR(1) );
+ #endif
+  
   node *target = first;
   while( target->next != NULL )
     {
@@ -117,6 +126,8 @@ int main( int argc, char **argv )
       free(target);
       target = tmp;
     }
+  if (target != NULL)
+    free(target);
   
   return 0;
 }
