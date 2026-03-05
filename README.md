@@ -3,7 +3,16 @@ This repository contains the slides, examples, materials and assignments for the
 
 *Materials from previous years are stored in repositories named `High-Performance-Computing-YYY`* 
 
+**Tecahers:**
+Luca Tornatore, Italian National Institute for Astrophysics, Astronomical Observatory of Trieste, Trieste
+luca.tornatore@inaf.it
 
+Stefano Cozzini, Area di Ricerca, Trieste
+stefano.cozzini@areasciencepark.it
+
+**Instructor:**
+Isac Pasianotto
+isac.pasianotto@areasciencepark.it
 
 The «Basic High-Performance Computing course» aims at teaching to master students the foundations of HPC:
 
