@@ -5,19 +5,25 @@ This repository contains the slides, examples, materials and assignments for the
 
 **Teachers:**
 
-Luca Tornatore, Italian National Institute for Astrophysics, Astronomical Observatory of Trieste, Trieste
+_HPC_  
 
+Luca Tornatore, Italian National Institute for Astrophysics, Astronomical Observatory of Trieste, Trieste  
 luca.tornatore@inaf.it
 
-Stefano Cozzini, Area di Ricerca, Trieste
-
+Stefano Cozzini, Area di Ricerca, Trieste  
 stefano.cozzini@areasciencepark.it
+
+_CLOUD_
+
+Giuliano Taffoni, Italian National Institute for Astrophysics, Astronomical Observatory of Trieste, Trieste  
+giuliano.taffoni@inaf.it  
 
 **Instructor:**
 
-Isac Pasianotto
-
+Isac Pasianotto  
 isac.pasianotto@areasciencepark.it
+
+---
 
 The «Basic High-Performance Computing course» aims at teaching to master students the foundations of HPC:
 
