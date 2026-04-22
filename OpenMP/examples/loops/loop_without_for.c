@@ -24,6 +24,7 @@
  │                                                                            │
  * ────────────────────────────────────────────────────────────────────────── */
 
+
 #if defined(__STDC__)
 #  if (__STDC_VERSION__ >= 199901L)
 #     define _XOPEN_SOURCE 700
@@ -35,63 +36,48 @@
 #include <omp.h>
 
 
-#if !defined(_OPENMP)
-#error "OpenNMP is mandatory"
-#endif
+#define N_default     1000  // how long is the main array
 
 int main( int argc, char **argv )
 {
 
-  int nthreads = 1;
+  int N         = N_default;
+  int nthreads  = 1;
 
-  
- #if defined(_OPENMP)              // the code between this if and the corresponding
-				   // #endif exists only if openmp support has been
-				   // switched on at the command line
-  
- #pragma omp parallel              // this creates a parallel region
-                                   // that is encompassed by the
-                                   // opening and closing { }
-                                   //
-                                   // you can modify the number of
-                                   // spawned threads through the
-                                   //   OMP_THREAD_NUM
-                                   // environmental variable
-  
-  {   
+  // check whether some arg has been passed on
+  if ( argc > 1 )
+    {
+      N = atoi( *(argv+1) );
+      if ( argc > 2 )
+	nthreads = atoi( *(argv+2) );
+    }
 
-   
+  if( nthreads > 1 )
+    omp_set_num_threads(nthreads);
+  #pragma omp parallel
+  {
+    int me       = omp_get_thread_num();
+    int nthreads = omp_get_num_threads();
     
-    int my_thread_id = omp_get_thread_num();  // note: this assignment is 
-                                              // thread-safe because the lvalue
-					      // is a private variable
+    int chunk    = N / nthreads;
+    int mod      = N % nthreads;
+    int my_first = chunk*me + ((me < mod)?me:mod);
+    int my_chunk = chunk + (mod > 0)*(me < mod);
 
-   #pragma omp masked              // only the thread 0 will execute the next line      
-    nthreads = omp_get_num_threads();
-    
-                                   // at the end of #pragma omp masked there is no
-                                   // implicit barrier.
-                                   // Hence, the order in which different threads
-                                   // will arrive at this print is undefined;
-                                   // 1) if you run this code several times, you will
-                                   // obtain different results
-                                   // 2) an undefined, and varying, number of greetings
-                                   // may use a non-updated value for nthreads,
-                                   // because the thread reads the shared value before
-                                   // thread 0's change has been propagated
+   #pragma omp single
+    printf("nthreads: %d, N: %d --- chunk is %d, reminder is %d\n", nthreads, N, chunk, mod);
 
-    #pragma omp barrier          // ...unless you uncomment this barrier
-    
-    printf( "\tgreetings from thread num %d out of %d\n",
-	    my_thread_id, nthreads );
-  }
-#else
-  
-  printf( "\tgreetings from thread num 0\n");
-#endif
-  
-  printf(" %d thread%s greeted you from the %sparallel region\n",	
-	 nthreads, (nthreads==1)?" has":"s have", (nthreads==1)?"(non)":"" );
-  
+    printf("thread %d : from %d to %d\n", me, my_first, my_first+my_chunk);
+
+    /*
+     * here you could then insert a for loop
+     * int my_stop = my_first + my_chunk;
+     * for( int i = myfirst; i < my_stop; i++ )
+     *   ...
+     */
+  } 
+
+
   return 0;
 }
+

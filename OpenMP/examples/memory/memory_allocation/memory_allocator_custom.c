@@ -24,74 +24,49 @@
  │                                                                            │
  * ────────────────────────────────────────────────────────────────────────── */
 
-#if defined(__STDC__)
-#  if (__STDC_VERSION__ >= 199901L)
-#     define _XOPEN_SOURCE 700
-#  endif
-#endif
+
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 #include <omp.h>
 
 
-#if !defined(_OPENMP)
-#error "OpenNMP is mandatory"
-#endif
-
-int main( int argc, char **argv )
+int main ( void )
 {
-
-  int nthreads = 1;
-
+  omp_allocator_handle_t custom_hbm_alloc;
+  omp_alloctrait_t traits[2];
   
- #if defined(_OPENMP)              // the code between this if and the corresponding
-				   // #endif exists only if openmp support has been
-				   // switched on at the command line
+  // Trait 1: 64-byte alignment for AVX-512 / SIMD optimization
+  traits[0].key = omp_atk_alignment;
+  traits[0].value = 64;
   
- #pragma omp parallel              // this creates a parallel region
-                                   // that is encompassed by the
-                                   // opening and closing { }
-                                   //
-                                   // you can modify the number of
-                                   // spawned threads through the
-                                   //   OMP_THREAD_NUM
-                                   // environmental variable
+  // Trait 2: Fallback policy. If High Bandwidth Memory is exhausted, 
+  // fall back to default RAM instead of returning a NULL pointer.
+  traits[1].key = omp_atk_fallback;
+  traits[1].value = omp_atv_default_mem_fb;
   
-  {   
+  // Initialize the allocator, binding it to the High Bandwidth memory space
+  custom_hbm_alloc = omp_init_allocator(omp_high_bw_mem_space, 2, traits);
 
-   
-    
-    int my_thread_id = omp_get_thread_num();  // note: this assignment is 
-                                              // thread-safe because the lvalue
-					      // is a private variable
-
-   #pragma omp masked              // only the thread 0 will execute the next line      
-    nthreads = omp_get_num_threads();
-    
-                                   // at the end of #pragma omp masked there is no
-                                   // implicit barrier.
-                                   // Hence, the order in which different threads
-                                   // will arrive at this print is undefined;
-                                   // 1) if you run this code several times, you will
-                                   // obtain different results
-                                   // 2) an undefined, and varying, number of greetings
-                                   // may use a non-updated value for nthreads,
-                                   // because the thread reads the shared value before
-                                   // thread 0's change has been propagated
-
-    #pragma omp barrier          // ...unless you uncomment this barrier
-    
-    printf( "\tgreetings from thread num %d out of %d\n",
-	    my_thread_id, nthreads );
-  }
-#else
+  // check that the initialization has been successful
+  if (custom_hbm_alloc == omp_null_allocator)
+    {
+      fprintf(stderr, "Failed to initialize custom allocator.\n");
+      return 1;
+    }
   
-  printf( "\tgreetings from thread num 0\n");
-#endif
+  // Use the custom allocator
+  size_t size = 2048 * sizeof(float);
+  float *vector = (float*) omp_alloc(size, custom_hbm_alloc);
   
-  printf(" %d thread%s greeted you from the %sparallel region\n",	
-	 nthreads, (nthreads==1)?" has":"s have", (nthreads==1)?"(non)":"" );
+ #pragma omp parallel for
+  for (int i = 0; i < 2048; i++)
+    vector[i] = i * 2.0f;
+  
+  printf("Vector[100] = %f\n", vector[100]);
+  
+  // Cleanup memory AND the allocator handle
+  omp_free(vector, custom_hbm_alloc);
+  omp_destroy_allocator(custom_hbm_alloc);
   
   return 0;
 }

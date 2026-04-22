@@ -24,6 +24,7 @@
  │                                                                            │
  * ────────────────────────────────────────────────────────────────────────── */
 
+
 #if defined(__STDC__)
 #  if (__STDC_VERSION__ >= 199901L)
 #     define _XOPEN_SOURCE 700
@@ -32,66 +33,76 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <omp.h>
 
 
-#if !defined(_OPENMP)
-#error "OpenNMP is mandatory"
-#endif
 
 int main( int argc, char **argv )
 {
 
-  int nthreads = 1;
+  long double PI              = 3.141592653589;
+  int         morning_coffees = 3;
+  char        passwd[]        = "DontAsk_DontTell";
+  int         passwd_len      = strlen(passwd);
+  int         final_mark;
+  int         Niter;
+  srand( time(NULL) );
+  Niter = rand() % 100;
 
-  
- #if defined(_OPENMP)              // the code between this if and the corresponding
-				   // #endif exists only if openmp support has been
-				   // switched on at the command line
-  
- #pragma omp parallel              // this creates a parallel region
-                                   // that is encompassed by the
-                                   // opening and closing { }
-                                   //
-                                   // you can modify the number of
-                                   // spawned threads through the
-                                   //   OMP_THREAD_NUM
-                                   // environmental variable
-  
-  {   
+  printf("Niter: %d\n", Niter);
+  // usual exercise: inspect the address of the variables
+  printf("\nThe addresses of shared-memory variables are as follows:\n"
+	 "PI              : %12p [value is %12.9Lg]\n"
+	 "morning coffees : %12p [value is %12d]\n"
+	 "passwd          : %12p [value is %12s] (len is %td)\n"
+	 "final_mark      : %12p [value is %12d]\n\n",
+	 &PI, PI,
+	 &morning_coffees, morning_coffees,
+	 &passwd, passwd, strlen(passwd),
+	 &final_mark, final_mark );
 
-   
+#pragma omp parallel firstprivate(PI, morning_coffees) private(passwd) shared(Niter)
+  {
+    // usual exercise: inspect the address of the variables
+
+    int myid = omp_get_thread_num();
+    int nthreads = omp_get_num_threads();
     
-    int my_thread_id = omp_get_thread_num();  // note: this assignment is 
-                                              // thread-safe because the lvalue
-					      // is a private variable
-
-   #pragma omp masked              // only the thread 0 will execute the next line      
-    nthreads = omp_get_num_threads();
+    PI              += myid;
+    morning_coffees += myid;
+    printf("th %d, %td\n", myid, strlen(passwd));
+    sprintf( passwd, "p::%-*d", passwd_len-4, myid);
     
-                                   // at the end of #pragma omp masked there is no
-                                   // implicit barrier.
-                                   // Hence, the order in which different threads
-                                   // will arrive at this print is undefined;
-                                   // 1) if you run this code several times, you will
-                                   // obtain different results
-                                   // 2) an undefined, and varying, number of greetings
-                                   // may use a non-updated value for nthreads,
-                                   // because the thread reads the shared value before
-                                   // thread 0's change has been propagated
+    int seed = myid;
 
-    #pragma omp barrier          // ...unless you uncomment this barrier
-    
-    printf( "\tgreetings from thread num %d out of %d\n",
-	    my_thread_id, nthreads );
+    #pragma omp for lastprivate(final_mark)
+    for ( int i = 0; i < Niter; i++)
+      final_mark = myid*100 + (rand_r(&seed) % 33);
+
+    printf("Thread %d\n\tThe addresses of private variables are as follows:\n"
+	   "\tPI              : %12p [value is %12.9Lg]\n"
+	   "\tmorning coffees : %12p [value is %12d]\n"
+	   "\tpasswd          : %12p [value is %12s] (len is %td)\n"
+	   "\tfinal_mark      : %12p [value is %12d]\n\n",
+	   myid, &PI, PI,
+	   &morning_coffees, morning_coffees,
+	   &passwd, passwd, strlen(passwd),
+	   &final_mark, final_mark );
+
   }
-#else
-  
-  printf( "\tgreetings from thread num 0\n");
-#endif
-  
-  printf(" %d thread%s greeted you from the %sparallel region\n",	
-	 nthreads, (nthreads==1)?" has":"s have", (nthreads==1)?"(non)":"" );
-  
+
+
+  printf("------------------------------------------\n"
+	 "The addresses of shared-memory variables are as follows:\n"
+	 "PI              : %12p [value is %12.9Lg]\n"
+	 "morning coffees : %12p [value is %12d]\n"
+	 "passwd          : %12p [value is %12s] (len is %td)\n"
+	 "final_mark      : %12p [value is %12d]\n",
+	 &PI, PI,
+	 &morning_coffees, morning_coffees,
+	 &passwd, passwd, strlen(passwd),
+	 &final_mark, final_mark );
+
   return 0;
 }

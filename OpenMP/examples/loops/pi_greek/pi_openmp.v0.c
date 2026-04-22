@@ -24,74 +24,63 @@
  │                                                                            │
  * ────────────────────────────────────────────────────────────────────────── */
 
-#if defined(__STDC__)
-#  if (__STDC_VERSION__ >= 199901L)
-#     define _XOPEN_SOURCE 700
-#  endif
-#endif
+/*
+ * This code is part of a set of codes that uses a trivial algorithm
+ * for the estimate of pi greek to illustrate some basic facts
+ * about performance in OpenMP.
+ *
+ * -- version 0 --
+ * discriminate points and accumulate valid ones using a critical region; 
+ * we expect the worst performance, both in terms
+ * of run-time and of scalability
+ *
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 #include <omp.h>
 
+#define DEFAULT 1000000
 
-#if !defined(_OPENMP)
-#error "OpenNMP is mandatory"
-#endif
-
-int main( int argc, char **argv )
+int main ( int argc, char **argv)
 {
 
-  int nthreads = 1;
+  long long unsigned int Nvalid = 0;
+  int                    nthreads;
+  
+ #pragma omp parallel  
+ #pragma omp master
+  nthreads = omp_get_num_threads();    
 
-  
- #if defined(_OPENMP)              // the code between this if and the corresponding
-				   // #endif exists only if openmp support has been
-				   // switched on at the command line
-  
- #pragma omp parallel              // this creates a parallel region
-                                   // that is encompassed by the
-                                   // opening and closing { }
-                                   //
-                                   // you can modify the number of
-                                   // spawned threads through the
-                                   //   OMP_THREAD_NUM
-                                   // environmental variable
-  
-  {   
+  long long int N = (argc > 1 ? atoll(argv[1]) : DEFAULT ) ;
+  printf("omp calculation with %d threads\nN=%Ld\n", nthreads ,N);
 
-   
+  double timing = omp_get_wtime();
+ #pragma omp parallel
+  {
+    int myid = omp_get_thread_num();
     
-    int my_thread_id = omp_get_thread_num();  // note: this assignment is 
-                                              // thread-safe because the lvalue
-					      // is a private variable
+    long int SEED = time(NULL);
+    int unsigned short myseeds[3] = {(short)(SEED+(myid)),
+				     (short)(SEED^(myid*3+1)),
+				     (short)(SEED&(myid*4+2))};
+    seed48( myseeds );
+    // ------------------------------------------
 
-   #pragma omp masked              // only the thread 0 will execute the next line      
-    nthreads = omp_get_num_threads();
-    
-                                   // at the end of #pragma omp masked there is no
-                                   // implicit barrier.
-                                   // Hence, the order in which different threads
-                                   // will arrive at this print is undefined;
-                                   // 1) if you run this code several times, you will
-                                   // obtain different results
-                                   // 2) an undefined, and varying, number of greetings
-                                   // may use a non-updated value for nthreads,
-                                   // because the thread reads the shared value before
-                                   // thread 0's change has been propagated
+    for( long long unsigned int i = 0; i < N; i++)
+      {
+	double x = erand48(myseeds);
+	double y = erand48(myseeds);
 
-    #pragma omp barrier          // ...unless you uncomment this barrier
+       #pragma omp critical
+	Nvalid += ( (x*x + y*y) < 1.0 );
+      }
+
+  }    
     
-    printf( "\tgreetings from thread num %d out of %d\n",
-	    my_thread_id, nthreads );
-  }
-#else
+  timing = omp_get_wtime() - timing;
   
-  printf( "\tgreetings from thread num 0\n");
-#endif
-  
-  printf(" %d thread%s greeted you from the %sparallel region\n",	
-	 nthreads, (nthreads==1)?" has":"s have", (nthreads==1)?"(non)":"" );
-  
+  printf("Estimation of pi: %1.9f\n Walltime:%g\n",
+	 (4.0*(double)Nvalid)/(N*nthreads), timing );
   return 0;
 }

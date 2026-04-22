@@ -24,10 +24,22 @@
  │                                                                            │
  * ────────────────────────────────────────────────────────────────────────── */
 
+/*
+ *  This code is equivalent to 01_array_sum.c but for the fact
+ *  that it prints the value of the loop counter at the first iteration
+ *  of every thread; in this way you can spy how the iteration space
+ *  is subdivided with a simple #pragma omp for
+ *
+ */
+
+
 #if defined(__STDC__)
 #  if (__STDC_VERSION__ >= 199901L)
 #     define _XOPEN_SOURCE 700
 #  endif
+#endif
+#if !defined(_OPENMP)
+#error "OpenMP support needed for this code"
 #endif
 #include <stdlib.h>
 #include <stdio.h>
@@ -35,63 +47,72 @@
 #include <omp.h>
 
 
-#if !defined(_OPENMP)
-#error "OpenNMP is mandatory"
-#endif
+#define N_default 100
+
 
 int main( int argc, char **argv )
 {
 
-  int nthreads = 1;
+  int     N        = N_default;
+  int     nthreads = 1;  
+  double *array;
 
+  /*  -----------------------------------------------------------------------------
+   *   initialize 
+   *  -----------------------------------------------------------------------------
+   */
+
+
+  // just give notice of what will happen and get the number of threads used
+ #pragma omp parallel
+ #pragma omp master
+  nthreads = omp_get_num_threads();
+
+  printf("omp summation with %d threads\n", nthreads );
+
+  // allocate memory
+  if ( (array = (double*)calloc( N, sizeof(double) )) == NULL )
+    {
+      printf("I'm sorry, there is not enough memory to host %lu bytes\n", N * sizeof(double) );
+      return 1;
+    }
+  // initialize the array
+  for ( int ii = 0; ii < N; ii++ )
+    array[ii] = (double)ii;
+
+
+  /*  -----------------------------------------------------------------------------
+   *   calculate
+   *  -----------------------------------------------------------------------------
+   */
+
+
+  double S           = 0;                                   // this will store the summation
   
- #if defined(_OPENMP)              // the code between this if and the corresponding
-				   // #endif exists only if openmp support has been
-				   // switched on at the command line
-  
- #pragma omp parallel              // this creates a parallel region
-                                   // that is encompassed by the
-                                   // opening and closing { }
-                                   //
-                                   // you can modify the number of
-                                   // spawned threads through the
-                                   //   OMP_THREAD_NUM
-                                   // environmental variable
-  
-  {   
-
-   
+ #pragma omp parallel 
+  {
+    int me      = omp_get_thread_num();
+    int i, first = 1;
     
-    int my_thread_id = omp_get_thread_num();  // note: this assignment is 
-                                              // thread-safe because the lvalue
-					      // is a private variable
-
-   #pragma omp masked              // only the thread 0 will execute the next line      
-    nthreads = omp_get_num_threads();
-    
-                                   // at the end of #pragma omp masked there is no
-                                   // implicit barrier.
-                                   // Hence, the order in which different threads
-                                   // will arrive at this print is undefined;
-                                   // 1) if you run this code several times, you will
-                                   // obtain different results
-                                   // 2) an undefined, and varying, number of greetings
-                                   // may use a non-updated value for nthreads,
-                                   // because the thread reads the shared value before
-                                   // thread 0's change has been propagated
-
-    #pragma omp barrier          // ...unless you uncomment this barrier
-    
-    printf( "\tgreetings from thread num %d out of %d\n",
-	    my_thread_id, nthreads );
+    printf("thread %d : &i is %p\n", me, &i);
+   #pragma omp for reduction(+:S)                              
+    for ( i = 0; i < N; i++ )
+      {
+	if ( first ) {
+	  printf("\tthread %d : &loopcounter is %p\n", me, &i); first = 0;}
+	S += array[i];
+      }    
   }
-#else
   
-  printf( "\tgreetings from thread num 0\n");
-#endif
+
+  /*  -----------------------------------------------------------------------------
+   *   finalize
+   *  -----------------------------------------------------------------------------
+   */
+
+  printf("Sum is %g\n\n", S );
   
-  printf(" %d thread%s greeted you from the %sparallel region\n",	
-	 nthreads, (nthreads==1)?" has":"s have", (nthreads==1)?"(non)":"" );
+  free( array );
   
   return 0;
 }
