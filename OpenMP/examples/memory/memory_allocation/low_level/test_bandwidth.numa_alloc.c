@@ -48,8 +48,13 @@
 
 #include <stdint.h>
 #include <unistd.h>
+
 #include <sys/types.h>
-#include <sys/mman.h>
+
+// needed for numalib interface
+#include <numa.h>
+#include <numaif.h>
+
 
 #include <omp.h>
 
@@ -68,20 +73,22 @@ void   probe_memory_alloc( uint64_t  );
   
 int main( int argc, char **argv )
 {
+  int numa_alloc             = 0;
   int probe_memory_placement = 0;
-
+  
   {
     int opt;
-    while ((opt = getopt(argc, argv, "hlbp")) != -1)
+    while ((opt = getopt(argc, argv, "hpn")) != -1)
       {
 	switch(opt)
 	  {
 	  case 'h':
 	    printf("possible options:\n"
+		   "-n allocate with explicit numa placement\n"
 		   "-p probe where mem pages are\n");
 	    return 0;
 	  case 'p': probe_memory_placement = 1; break;
-	  case '?': return 1;
+	  case '?': printf("invalid option\n"); return 1;
 	  }
       }
   }
@@ -97,7 +104,7 @@ int main( int argc, char **argv )
   
   if ( bind != NULL )
     printf("OMP_PROC_BINDING is set to %s\n", bind);
-  
+
   int nsockets;
  #pragma omp parallel
  #pragma omp single
@@ -114,8 +121,16 @@ int main( int argc, char **argv )
     int mysocket = omp_get_place_num();  // get on what socket this thread is running on
 
     thread_to_socket[me] = mysocket;
-    data[me] = (double*)aligned_alloc( 64, DOUBLE_DATASIZE*sizeof(double) );
 
+    if ( numa_alloc )
+      {
+	// use libnuma to allocate memory on the nearest NUMA node
+	data[me] = (double*)numa_alloc_onnode(DOUBLE_DATASIZE * sizeof(double), mysocket);
+      }
+    else
+      {    
+	data[me] = (double*)aligned_alloc( 64, DOUBLE_DATASIZE*sizeof(double) );
+      }
     
     // initialize, touch, drag through cache and TLB
     for ( int i = 0; i < DOUBLE_DATASIZE; i++ )
@@ -124,13 +139,20 @@ int main( int argc, char **argv )
    #pragma omp barrier
 
    #pragma omp single
-    {
+    {      
       if ( probe_memory_placement )
+	// we want to show where exactly the memory pages
+	// are mapped
 	probe_memory_alloc( DOUBLE_DATASIZE * sizeof(double) );
-      printf( "running the experiment for %d sockets..\n\n", nsockets );
+      printf( "running the experiment for %d sockets..\n\n", nsockets );  
     }
 
+
     double bw[nsockets];   // nsockets is expected to be just a few
+
+    /* ******************************************************************* *
+     *  R U N  the   E X P E R I M E N T                                   *     
+     * ******************************************************************* */
     
     for ( int runner = 0; runner < nsockets; runner ++ )
       {
@@ -193,11 +215,11 @@ int main( int argc, char **argv )
     
    #pragma omp barrier
 
-   #if defined(NUMA_ALLOC)
-    numa_free( data[me], DOUBLE_DATASIZE * sizeof(double) );
-   #else
-    free( data[me] );
-   #endif
+    if ( numa_alloc )
+       numa_free( data[me], DOUBLE_DATASIZE * sizeof(double) );
+    else
+       free( data[me] );
+   
   }
 
   return 0;
@@ -213,17 +235,20 @@ int cmp( const void *a, const void *b )
 
 double stream( const double * restrict array, unsigned int N, double *stddev, double *result )
 {
-  unsigned int _N  = N&0xFFFFFF8;  // renders clear that _N is a multiple of 8
-  const double *_a = (const double*) __builtin_assume_aligned( array, 64 );
-
  #if !defined(UNROLL_FACTOR)
  #define UNROLL_FACTOR 8
  #endif
  #if !defined(NREPS)
  #define NREPS 1
- #warning "using just 1 repetition for the stream" 
+ #warning "using just 1 repetition for the stream: compile with -DNREPS=N to have N repetitions (advice: N>~10)" 
  #endif
-  
+
+
+  //unsigned int _N  = N&0xFFFFFF8;  // renders clear that _N is a multiple of 8
+  unsigned int _N  = N&(~((UNROLL_FACTOR)-1));  // renders clear that _N is a multiple of 8
+  const double *_a = (const double*) __builtin_assume_aligned( array, 64 );
+
+ 
   double timings[NREPS] = {0};
 
   for ( int r = 0; r < NREPS; r++ )
